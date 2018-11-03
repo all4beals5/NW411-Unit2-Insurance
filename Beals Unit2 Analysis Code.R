@@ -7,6 +7,7 @@
 ### Load packages
 library(corrplot)
 library(fastDummies)
+library(zoo)
 
 ##################################################
 ### Set working directory & read data
@@ -66,9 +67,26 @@ data$RED_CAR <- ifelse(data$RED_CAR=='yes',1,0)
 data$FEMALE <- ifelse(data$SEX=='z_F',1,0)
 data$MARRIED <- ifelse(data$MSTATUS=='Yes',1,0)
 data$SINGLE_PARENT <- ifelse(data$PARENT1=='Yes',1,0)
-data$HOME_OWNER <- ifelse(data$HOME_VAL>0,1,0)
 data$URBAN <- ifelse(data$URBANICITY=='Highly Urban/ Urban',1,0)
 data$REVOKED <- ifelse(data$REVOKED=='Yes',1,0)
+
+### Imputation
+data$AGE_IMP <- ifelse(is.na(data$AGE)==TRUE,1,0)
+data$YOJ_IMP <- ifelse(is.na(data$YOJ)==TRUE,1,0)
+data$INCOME_IMP <- ifelse(is.na(data$INCOME)==TRUE,1,0)
+data$HOME_VAL_IMP <- ifelse(is.na(data$HOME_VAL)==TRUE,1,0)
+data$CAR_AGE_IMP <- ifelse(is.na(data$CAR_AGE)==TRUE,1,0)
+
+data$AGE <- na.aggregate(data$AGE, data$EDUCATION, mean, na.rm = TRUE)
+data$YOJ <- na.aggregate(data$YOJ, data$JOB, mean, na.rm = TRUE)
+data$INCOME <- na.aggregate(data$INCOME, c(data$JOB,data$EDUCATION), mean, na.rm = TRUE)
+data$HOME_VAL <- na.aggregate(data$HOME_VAL, c(data$JOB,data$MSTATUS,data$INCOME), mean, na.rm = TRUE)
+data$CAR_AGE <- mean(data$CAR_AGE, na.rm = TRUE)
+
+# JOB
+
+### New fields and limiting columns
+data$HOME_OWNER <- ifelse(data$HOME_VAL>0,1,0)
 datanumeric <- data[,-c(1,3,9,11,12,13,14,16,19,26)]
 
 ### Correlation Matrix
@@ -85,9 +103,11 @@ corrplot(cor(datanumeric, use="complete.obs"), method="color", type="upper", tl.
 # a customer's age and the number of kids at home are negatively correlated
 # nothing is highly correlated with the response variable
 
-### Imputation
-# JOB
-
+### Rename values
+# Education Z_High School
+# JOB z_Blue Collar
+# JOB Unknown (N/A) Impute?
+# CAR TYPE z_SUV
 
 ### Create dummy variables
 datadummy <- data[,-c(1,3,9,11,12,16,26)]
@@ -96,6 +116,7 @@ datadummy <- datadummy[,-c(8,9,13)]
 corrplot(cor(datadummy, use="complete.obs"), method="color", type="upper", tl.col="black", tl.cex=.7, 
          addCoef.col="black", number.cex=.5)
 
+# 
 
 basicmodel <- lm(TARGET_FLAG~., data=data)
 summary(basicmodel)

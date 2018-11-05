@@ -144,7 +144,7 @@ model1 <- glm(TARGET_FLAG~., data=datadummy, family=binomial())
 summary(model1)
 model1prediction <- predict(model1, type = "response")
 hist(model1prediction)
-optimalCutoff(datadummy$TARGET_FLAG, model1prediction) # 0.4668226
+optCutOff1 <- optimalCutoff(datadummy$TARGET_FLAG, model1prediction) # 0.4668226
 vif(model1)
 
 ### Limit logistic model (model 2)
@@ -153,7 +153,7 @@ model2 <- glm(TARGET_FLAG~KIDSDRIV+INCOME+TRAVTIME+BLUEBOOK+TIF+OLDCLAIM+CLM_FRE
 summary(model2)
 model2prediction <- predict(model2, type = "response")
 hist(model2prediction)
-optimalCutoff(datadummy$TARGET_FLAG, model2prediction) # 0.4836009
+optCutOff2 <- optimalCutoff(datadummy$TARGET_FLAG, model2prediction) # 0.4836009
 vif(model2)
 
 ### Full probit model (model 3)
@@ -161,7 +161,7 @@ model3 <- glm(TARGET_FLAG~., data=datadummy, family=binomial(link="probit"))
 summary(model3)
 model3prediction <- predict(model3, type = "response")
 hist(model3prediction)
-optimalCutoff(datadummy$TARGET_FLAG, model3prediction) # 0.4733581
+optCutOff3 <- optimalCutoff(datadummy$TARGET_FLAG, model3prediction) # 0.4733581
 vif(model3)
 
 ### Limit probit model (model 4)
@@ -170,7 +170,7 @@ model4 <- glm(TARGET_FLAG~KIDSDRIV+INCOME+TRAVTIME+BLUEBOOK+TIF+OLDCLAIM+CLM_FRE
 summary(model4)
 model4prediction <- predict(model4, type = "response")
 hist(model4prediction)
-optimalCutoff(datadummy$TARGET_FLAG, model4prediction) # 0.4797163
+optCutOff4 <- optimalCutoff(datadummy$TARGET_FLAG, model4prediction) # 0.4797163
 vif(model4)
 
 ### Stepwise model
@@ -178,7 +178,7 @@ model5 <- step(model1, direction="both")
 summary(model5)
 model5prediction <- predict(model5, type = "response")
 hist(model5prediction)
-optimalCutoff(datadummy$TARGET_FLAG, model5prediction) # 0.5070527
+optCutOff5 <- optimalCutoff(datadummy$TARGET_FLAG, model5prediction) # 0.5070527
 vif(model5)
 
 ### Model for TARGET_AMT
@@ -193,33 +193,68 @@ summary(targetamtmodel2)
 
 ##################################################
 ### Model selection
-AIC(Model1)
-AIC(Model2)
-AIC(Model3)
-AIC(Model4)
-AIC(Model5)
-BIC(Model1)
-BIC(Model2)
-BIC(Model3)
-BIC(Model4)
-BIC(Model5)
-print(-2*logLik(Model1, REML = TRUE))
-print(-2*logLik(Model2, REML = TRUE))
-print(-2*logLik(Model3, REML = TRUE))
-print(-2*logLik(Model4, REML = TRUE))
-print(-2*logLik(Model5, REML = TRUE))
-ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model1prediction)
-ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model2prediction)
-ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model3prediction)
-ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model4prediction)
-ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model5prediction)
+matrix(data=c(
+  AIC(model1),
+  AIC(model2),
+  AIC(model3),
+  AIC(model4),
+  AIC(model5),
+  BIC(model1),
+  BIC(model2),
+  BIC(model3),
+  BIC(model4),
+  BIC(model5),
+  (-2*logLik(model1, REML = TRUE)),
+  (-2*logLik(model2, REML = TRUE)),
+  (-2*logLik(model3, REML = TRUE)),
+  (-2*logLik(model4, REML = TRUE)),
+  (-2*logLik(model5, REML = TRUE)),
+  ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model1prediction),
+  ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model2prediction),
+  ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model3prediction),
+  ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model4prediction),
+  ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model5prediction)
+), ncol=4, byrow=FALSE, 
+dimnames=list(c("model1","model2","model3","model4","model5"),c("AIC","BIC","Log Likelihood Deviance","KS")))
+# model5 does better on every metric except the ks metric
 
 # Area under the curve
+plotROC(datadummy$TARGET_FLAG, model1prediction) #0.8137
+plotROC(datadummy$TARGET_FLAG, model2prediction) #0.804
+plotROC(datadummy$TARGET_FLAG, model3prediction) #0.8136
+plotROC(datadummy$TARGET_FLAG, model4prediction) #0.8039
+plotROC(datadummy$TARGET_FLAG, model5prediction) #0.8132
 
 # Concordance
+matrix(data=c(
+Concordance(datadummy$TARGET_FLAG, model1prediction),
+Concordance(datadummy$TARGET_FLAG, model2prediction),
+Concordance(datadummy$TARGET_FLAG, model3prediction),
+Concordance(datadummy$TARGET_FLAG, model4prediction),
+Concordance(datadummy$TARGET_FLAG, model5prediction)
+), ncol=4, byrow=TRUE,
+dimnames=list(c("model1","model2","model3","model4","model5"),c("Concordance","Discordance","Tied","Pairs")))
 
 # Misclassification error
+misClassError(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff1)
+misClassError(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff2)
+misClassError(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff3)
+misClassError(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff4)
+misClassError(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff5)
+# lowest error on model5, but all basically the same
 
-# Specificity and sensitivity
+# Sensitivity
+sensitivity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff1)
+sensitivity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff2)
+sensitivity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff3)
+sensitivity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff4)
+sensitivity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff5)
+
+# Specificity
+specificity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff1)
+specificity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff2)
+specificity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff3)
+specificity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff4)
+specificity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff5)
 
 

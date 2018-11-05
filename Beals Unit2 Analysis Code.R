@@ -8,6 +8,14 @@
 library(corrplot)
 library(fastDummies)
 library(zoo)
+library(InformationValue)
+library(car)
+
+### Functions
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
 
 ##################################################
 ### Set working directory & read data
@@ -81,13 +89,16 @@ data$AGE <- na.aggregate(data$AGE, data$EDUCATION, mean, na.rm = TRUE)
 data$YOJ <- na.aggregate(data$YOJ, data$JOB, mean, na.rm = TRUE)
 data$INCOME <- na.aggregate(data$INCOME, c(data$JOB,data$EDUCATION), mean, na.rm = TRUE)
 data$HOME_VAL <- na.aggregate(data$HOME_VAL, c(data$JOB,data$MSTATUS,data$INCOME), mean, na.rm = TRUE)
-data$CAR_AGE <- mean(data$CAR_AGE, na.rm = TRUE)
+data$CAR_AGE[is.na(data$CAR_AGE)] <- mean(data$CAR_AGE, na.rm = TRUE)
 
-# JOB
+### Remove Illogical Data
+data <- data[data$CAR_AGE>=0,]
+
+# JOB - possibly impute using education and gender
 
 ### New fields and limiting columns
 data$HOME_OWNER <- ifelse(data$HOME_VAL>0,1,0)
-datanumeric <- data[,-c(1,3,9,11,12,13,14,16,19,26)]
+datanumeric <- data[,-c(1,3,9,11,12,13,14,16,19,26,32,33,34,35,36)]
 
 ### Correlation Matrix
 corrplot(cor(datanumeric, use="complete.obs"), method="color", type="upper", tl.col="black", tl.cex=.7, 
@@ -103,12 +114,6 @@ corrplot(cor(datanumeric, use="complete.obs"), method="color", type="upper", tl.
 # a customer's age and the number of kids at home are negatively correlated
 # nothing is highly correlated with the response variable
 
-### Rename values
-# Education Z_High School
-# JOB z_Blue Collar
-# JOB Unknown (N/A) Impute?
-# CAR TYPE z_SUV
-
 ### Create dummy variables
 datadummy <- data[,-c(1,3,9,11,12,16,26)]
 datadummy <- dummy_cols(datadummy, remove_first_dummy=TRUE)
@@ -116,18 +121,105 @@ datadummy <- datadummy[,-c(8,9,13)]
 corrplot(cor(datadummy, use="complete.obs"), method="color", type="upper", tl.col="black", tl.cex=.7, 
          addCoef.col="black", number.cex=.5)
 
-# 
+# positive correlation between having a masters degree and being a lawyer
+# negative correlation between having a blue collar job and private use vehicle (meaning they use commercial vehicles)
+# positive correlation between being female and driving an SUV
+# positive correlation between having a panel truck and high bluebook value
 
-basicmodel <- lm(TARGET_FLAG~., data=data)
-summary(basicmodel)
-
-### Remove Illogical Data
-# data <- data[data$CAR_AGE>=0,]
-
+### Rename values
+# JOB Unknown (N/A) Impute?
+names(datadummy)[names(datadummy)=="EDUCATION_z_High School"] <- "EDUCATION_High_School"
+names(datadummy)[names(datadummy)=="EDUCATION_<High School"] <- "EDUCATION_Less_High_School"
+names(datadummy)[names(datadummy)=="JOB_z_Blue Collar"] <- "JOB_Blue_Collar"
+names(datadummy)[names(datadummy)=="JOB_Home Maker"] <- "JOB_Home_Maker"
+names(datadummy)[names(datadummy)=="JOB_"] <- "JOB_Unknown"
+names(datadummy)[names(datadummy)=="CAR_TYPE_z_SUV"] <- "CAR_TYPE_SUV"
+names(datadummy)[names(datadummy)=="CAR_TYPE_Sports Car"] <- "CAR_TYPE_Sports_Car"
+names(datadummy)[names(datadummy)=="CAR_TYPE_Panel Truck"] <- "CAR_TYPE_Panel_Truck"
 
 ##################################################
 ### Model creation
+### Full logistic model (model 1)
+model1 <- glm(TARGET_FLAG~., data=datadummy, family=binomial())
+summary(model1)
+model1prediction <- predict(model1, type = "response")
+hist(model1prediction)
+optimalCutoff(datadummy$TARGET_FLAG, model1prediction) # 0.4668226
+vif(model1)
+
+### Limit logistic model (model 2)
+model2 <- glm(TARGET_FLAG~KIDSDRIV+INCOME+TRAVTIME+BLUEBOOK+TIF+OLDCLAIM+CLM_FREQ+REVOKED+MVR_PTS+PRIVATE_USE+MARRIED+SINGLE_PARENT+URBAN+HOME_OWNER+
+                CAR_TYPE_SUV+CAR_TYPE_Sports_Car+CAR_TYPE_Van+CAR_TYPE_Panel_Truck+CAR_TYPE_Pickup, data=datadummy, family=binomial())
+summary(model2)
+model2prediction <- predict(model2, type = "response")
+hist(model2prediction)
+optimalCutoff(datadummy$TARGET_FLAG, model2prediction) # 0.4836009
+vif(model2)
+
+### Full probit model (model 3)
+model3 <- glm(TARGET_FLAG~., data=datadummy, family=binomial(link="probit"))
+summary(model3)
+model3prediction <- predict(model3, type = "response")
+hist(model3prediction)
+optimalCutoff(datadummy$TARGET_FLAG, model3prediction) # 0.4733581
+vif(model3)
+
+### Limit probit model (model 4)
+model4 <- glm(TARGET_FLAG~KIDSDRIV+INCOME+TRAVTIME+BLUEBOOK+TIF+OLDCLAIM+CLM_FREQ+REVOKED+MVR_PTS+PRIVATE_USE+MARRIED+SINGLE_PARENT+URBAN+HOME_OWNER+
+                CAR_TYPE_SUV+CAR_TYPE_Sports_Car+CAR_TYPE_Van+CAR_TYPE_Panel_Truck+CAR_TYPE_Pickup, data=datadummy, family=binomial(link="probit"))
+summary(model4)
+model4prediction <- predict(model4, type = "response")
+hist(model4prediction)
+optimalCutoff(datadummy$TARGET_FLAG, model4prediction) # 0.4797163
+vif(model4)
+
+### Stepwise model
+model5 <- step(model1, direction="both")
+summary(model5)
+model5prediction <- predict(model5, type = "response")
+hist(model5prediction)
+optimalCutoff(datadummy$TARGET_FLAG, model5prediction) # 0.5070527
+vif(model5)
+
+### Model for TARGET_AMT
+datatargetamt <- cbind(data[,3], datadummy[,-1])
+names(datatargetamt)[1] <- "TARGET_AMT"
+
+targetamtmodel <- lm(TARGET_AMT~., data=datatargetamt)
+summary(targetamtmodel)
+
+targetamtmodel2 <- step(targetamtmodel, direction="both")
+summary(targetamtmodel2)
 
 ##################################################
 ### Model selection
+AIC(Model1)
+AIC(Model2)
+AIC(Model3)
+AIC(Model4)
+AIC(Model5)
+BIC(Model1)
+BIC(Model2)
+BIC(Model3)
+BIC(Model4)
+BIC(Model5)
+print(-2*logLik(Model1, REML = TRUE))
+print(-2*logLik(Model2, REML = TRUE))
+print(-2*logLik(Model3, REML = TRUE))
+print(-2*logLik(Model4, REML = TRUE))
+print(-2*logLik(Model5, REML = TRUE))
+ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model1prediction)
+ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model2prediction)
+ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model3prediction)
+ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model4prediction)
+ks_stat(actuals=datadummy$TARGET_FLAG, predictedScores=model5prediction)
+
+# Area under the curve
+
+# Concordance
+
+# Misclassification error
+
+# Specificity and sensitivity
+
 

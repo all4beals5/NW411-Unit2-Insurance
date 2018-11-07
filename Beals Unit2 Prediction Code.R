@@ -57,6 +57,9 @@ names(ins)[names(ins)=="CAR_TYPE_Panel Truck"] <- "CAR_TYPE_Panel_Truck"
 
 ### Create new fields
 ins$HOME_OWNER <- ifelse(ins$HOME_VAL>0,1,0)
+ins$JOB_Manager <- 0
+ins$EDUCATION_Bachelors <- 0
+ins$CAR_TYPE_Van <- 0
 
 ### Model scoring
 # *** Assumes model5 is available as a global variable ****
@@ -64,11 +67,11 @@ ins$HOME_OWNER <- ifelse(ins$HOME_VAL>0,1,0)
 
 ins$P_TARGET_FLAG <- predict(model5, newdata = ins, type = "response")
 ins$P_TARGET_AMT <- predict(targetamtmodel2, newdata = ins, type = "response")
+ins$P_TARGET_AMT[ins$P_TARGET_AMT<0] <- 0
 
 ### Subset output
-prediction <- insurance[c("INDEX","P_TARGET_FLAG","P_TARGET_AMT")]
+prediction <- ins[c("INDEX","P_TARGET_FLAG","P_TARGET_AMT")]
 
 ### Prediction output 
 write.xlsx(prediction, file = "Brandi Beals Unit2 Predictions.xlsx", sheetName = "Predictions", col.names = TRUE)
-
 

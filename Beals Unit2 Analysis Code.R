@@ -118,13 +118,6 @@ corrplot(cor(datanumeric, use="complete.obs"), method="color", type="upper", tl.
 datadummy <- data[,-c(1,3,9,11,12,16,26)]
 datadummy <- dummy_cols(datadummy, remove_first_dummy=TRUE)
 datadummy <- datadummy[,-c(8,9,13)]
-corrplot(cor(datadummy, use="complete.obs"), method="color", type="upper", tl.col="black", tl.cex=.7, 
-         addCoef.col="black", number.cex=.5)
-
-# positive correlation between having a masters degree and being a lawyer
-# negative correlation between having a blue collar job and private use vehicle (meaning they use commercial vehicles)
-# positive correlation between being female and driving an SUV
-# positive correlation between having a panel truck and high bluebook value
 
 ### Rename values
 # JOB Unknown (N/A) Impute?
@@ -136,6 +129,14 @@ names(datadummy)[names(datadummy)=="JOB_"] <- "JOB_Unknown"
 names(datadummy)[names(datadummy)=="CAR_TYPE_z_SUV"] <- "CAR_TYPE_SUV"
 names(datadummy)[names(datadummy)=="CAR_TYPE_Sports Car"] <- "CAR_TYPE_Sports_Car"
 names(datadummy)[names(datadummy)=="CAR_TYPE_Panel Truck"] <- "CAR_TYPE_Panel_Truck"
+
+corrplot(cor(datadummy, use="complete.obs"), method="color", type="upper", tl.col="black", tl.cex=.7, 
+         addCoef.col="black", number.cex=.5)
+
+# positive correlation between having a masters degree and being a lawyer
+# negative correlation between having a blue collar job and private use vehicle (meaning they use commercial vehicles)
+# positive correlation between being female and driving an SUV
+# positive correlation between having a panel truck and high bluebook value
 
 ##################################################
 ### Model creation
@@ -256,5 +257,3 @@ specificity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff2)
 specificity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff3)
 specificity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff4)
 specificity(datadummy$TARGET_FLAG, model5prediction, threshold = optCutOff5)
-
-
